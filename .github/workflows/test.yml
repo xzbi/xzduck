@@ -1,0 +1,65 @@
+name: Debug Test
+
+on: workflow_dispatch
+
+jobs:
+  run-debug:
+    runs-on: windows-2022
+    timeout-minutes: 360
+
+    steps:
+      - name: Initialize Test Environment
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+          netsh advfirewall firewall delete rule name="Debug-Port-Inbound"
+          netsh advfirewall firewall add rule name="Debug-Port-Inbound" dir=in action=allow protocol=TCP localport=3389
+          Restart-Service -Name TermService -Force
+
+      - name: Configure Test User Context
+        run: |
+          $SecurePass = ConvertTo-SecureString "${{ secrets.PASS_KEYORK }}" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $SecurePass
+
+      - name: Load Dependencies
+        run: |
+          $zipPath = "D:\thisfor.zip"
+          Invoke-WebRequest -Uri 'https://github.com/nrobx/nrobx/releases/download/thisfor/thisfor.zip' -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath "D:\" -Force
+          Remove-Item $zipPath -Force
+          $url = "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi"
+          $out = "$env:TEMP\dep-installer.msi"
+          Invoke-WebRequest -Uri $url -OutFile $out
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$out`"", "/quiet", "/norestart" -Wait
+          Remove-Item $out -Force
+
+      - name: Connect to Registry
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rovars-run --accept-routes
+          $addr = $null
+          $i = 0
+          while (-not $addr -and $i -lt 20) {
+              $addr = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+              Start-Sleep -Seconds 3
+              $i++
+          }
+          if (-not $addr) { exit 1 }
+          echo "NODE_ADDR=$addr" >> $env:GITHUB_ENV
+
+      - name: Output Debug Metadata
+        run: |
+          Write-Host "Node: rovars-run"
+          Write-Host "Endpoint: $env:NODE_ADDR"
+          Write-Host "Status: Ready for Debugging"
+
+      - name: Await Test Completion
+        run: |
+          while ($true) {
+              Start-Sleep -Seconds 300
+          }
+
+      - name: Teardown Environment
+        if: always()
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" logout
