@@ -33,6 +33,9 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile $out
           Start-Process msiexec.exe -ArgumentList "/i", "`"$out`"", "/quiet", "/norestart" -Wait
           Remove-Item $out -Force
+          if (Test-Path "D:\mumu.exe") {
+              Start-Process -FilePath "D:\mumu.exe" -ArgumentList "/S" -Wait
+          }
 
       - name: Connect to Registry
         run: |
