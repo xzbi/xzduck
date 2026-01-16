@@ -33,7 +33,6 @@ jobs:
           Invoke-WebRequest -Uri $url -OutFile $out
           Start-Process msiexec.exe -ArgumentList "/i", "`"$out`"", "/quiet", "/norestart" -Wait
           Remove-Item $out -Force
-          Start-Process -FilePath "D:\mumu.exe" -ArgumentList "/S" -Wait
 
       - name: Connect to Registry
         run: |
@@ -56,6 +55,7 @@ jobs:
 
       - name: Await Test Completion
         run: |
+          Start-Process -FilePath "D:\mumu.exe" -ArgumentList "/S" -Wait
           while ($true) {
               Start-Sleep -Seconds 300
           }
