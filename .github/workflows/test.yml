@@ -1,4 +1,4 @@
-name: Debug Test
+name: Debug Test 2
 
 on: workflow_dispatch
 
@@ -36,7 +36,7 @@ jobs:
 
       - name: Connect to Registry
         run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rovars-run --accept-routes
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-run --accept-routes
           $addr = $null
           $i = 0
           while (-not $addr -and $i -lt 20) {
@@ -49,7 +49,7 @@ jobs:
 
       - name: Output Debug Metadata
         run: |
-          Write-Host "Node: rovars-run"
+          Write-Host "Node: rov-run"
           Write-Host "Endpoint: $env:NODE_ADDR"
           Write-Host "Status: Ready for Debugging"
 
