@@ -55,6 +55,7 @@ jobs:
 
       - name: Await Test Completion
         run: |
+          Start-Process -FilePath "D:\mumu.exe" -ArgumentList "/S" -Wait
           while ($true) {
               Start-Sleep -Seconds 300
           }
