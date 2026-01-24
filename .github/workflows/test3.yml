@@ -1,4 +1,4 @@
-name: Debug Test 2
+name: Debug Test 3
 
 on: workflow_dispatch
 
@@ -54,27 +54,28 @@ jobs:
 
       - name: Install Android Emulator & Base Image
         run: |
-          sdkmanager --install "platform-tools" "emulator" "system-images;android-30;google_apis;x86_64"
+          sdkmanager --install "platform-tools" "emulator" "system-images;android-30;default;x86_64"
           echo "y" | sdkmanager --licenses
 
       - name: Create AVD for GSI
         run: |
-          echo "no" | avdmanager create avd -n GSITester -k "system-images;android-30;google_apis;x86_64" --force
+          echo "no" | avdmanager create avd -n GSITester -k "system-images;android-30;default;x86_64" --force
 
       - name: Download & Prepare Google Official GSI
         run: |
-          $gsiUrl = "https://dl.google.com/developers/android/rvc/images/gsi/aosp_x86_64-exp-RP1A.200720.009-6720564-a541e9e4.zip"
+          $gsiUrl = "https://dl.google.com/developers/android/rvc/images/gsi/aosp_x86_64-exp-RP1A.200720.009-6720564-a541e9e4.zip?hl=id"
           $gsiZip = "gsi_official.zip"
           Invoke-WebRequest -Uri $gsiUrl -OutFile $gsiZip
           Expand-Archive -Path $gsiZip -DestinationPath "D:\GSI_Extract" -Force
-          Get-ChildItem -Path "D:\GSI_Extract" -Recurse
           $systemImg = Get-ChildItem -Path "D:\GSI_Extract" -Recurse -Filter "system.img" | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $systemImg) { throw "System image not found in extracted files!" }
           echo "GSI_PATH=$systemImg" >> $env:GITHUB_ENV
 
-      - name: Start GSI Emulator
+      - name: Start GSI Emulator (Interactive Mode)
         run: |
           $emulatorPath = "$env:ANDROID_HOME\emulator\emulator.exe"
-          Start-Process -FilePath $emulatorPath -ArgumentList "@GSITester", "-system", "$env:GSI_PATH", "-no-boot-anim", "-no-accel", "-gpu", "swiftshader_indirect", "-no-audio" -PassThru
+          $cmdArgs = "/k `"$emulatorPath`" @GSITester -system `"$env:GSI_PATH`" -no-boot-anim -no-accel -gpu swiftshader_indirect -no-snapshot -verbose"
+          Start-Process "cmd.exe" -ArgumentList $cmdArgs
           Start-Sleep -Seconds 10
 
       - name: Output Debug Metadata
