@@ -1,4 +1,4 @@
-name: Debug Test 3
+name: Debug Test 2
 
 on: workflow_dispatch
 
@@ -63,7 +63,7 @@ jobs:
 
       - name: Download & Prepare Google Official GSI
         run: |
-          $gsiUrl = "https://dl.google.com/developers/android/rvc/images/gsi/aosp_x86_64-exp-RP1A.200720.009-6720564-a541e9e4.zip?hl=id"
+          $gsiUrl = "https://dl.google.com/developers/android/rvc/images/gsi/aosp_x86_64-exp-RP1A.200720.009-6720564-a541e9e4.zip"
           $gsiZip = "gsi_official.zip"
           Invoke-WebRequest -Uri $gsiUrl -OutFile $gsiZip
           Expand-Archive -Path $gsiZip -DestinationPath "D:\GSI_Extract" -Force
@@ -71,11 +71,13 @@ jobs:
           if (-not $systemImg) { throw "System image not found in extracted files!" }
           echo "GSI_PATH=$systemImg" >> $env:GITHUB_ENV
 
-      - name: Start GSI Emulator (Interactive Mode)
+      - name: Start GSI Emulator
         run: |
-          $emulatorPath = "$env:ANDROID_HOME\emulator\emulator.exe"
-          $cmdArgs = "/k `"$emulatorPath`" @GSITester -system `"$env:GSI_PATH`" -no-boot-anim -no-accel -gpu swiftshader_indirect -no-snapshot -verbose"
-          Start-Process "cmd.exe" -ArgumentList $cmdArgs
+          $emulatorPath = Join-Path $env:ANDROID_HOME "emulator\emulator.exe"
+          Write-Host "Emulator Path: $emulatorPath"
+          Write-Host "GSI Path: $env:GSI_PATH"
+          
+          Start-Process -FilePath $emulatorPath -ArgumentList "@GSITester", "-system", "$env:GSI_PATH", "-no-boot-anim", "-no-accel", "-gpu", "swiftshader_indirect", "-no-audio", "-verbose" -PassThru
           Start-Sleep -Seconds 10
 
       - name: Output Debug Metadata
