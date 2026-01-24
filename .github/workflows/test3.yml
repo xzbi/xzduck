@@ -63,7 +63,7 @@ jobs:
 
       - name: Download & Prepare Google Official GSI
         run: |
-          $gsiUrl = "https://dl.google.com/developers/android/vic/images/gsi/aosp_x86_64-img-11161206.zip"
+          $gsiUrl = "https://dl.google.com/developers/android/qt/images/gsi/aosp_x86_64-exp-QJR1.191112.001-6004257.zip"
           $gsiZip = "gsi_official.zip"
           Invoke-WebRequest -Uri $gsiUrl -OutFile $gsiZip
           Expand-Archive -Path $gsiZip -DestinationPath "D:\GSI_Extract" -Force
