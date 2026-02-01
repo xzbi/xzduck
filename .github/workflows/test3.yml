@@ -38,8 +38,8 @@ jobs:
 
       - name: Script Generation
         run: |
-          $StartupPath = [Environment]::GetFolderPath("Startup")
-          $BatFile = "$StartupPath\AUTO_START.bat"
+          $DesktopPath = [Environment]::GetFolderPath("Desktop")
+          $BatFile = "$DesktopPath\START_BLISS.bat"
           $Content = @"
           @echo off
           D:
