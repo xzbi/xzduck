@@ -1,83 +1,31 @@
-name: System Integration Matrix
+name: Production Build Pipeline
 
 on: workflow_dispatch
 
 jobs:
-  integration-test:
-    runs-on: windows-2022
+  build-core:
+    runs-on: ubuntu-latest
     timeout-minutes: 360
 
     steps:
-      - name: Repository Synchronization
-        uses: actions/checkout@v4
-
-      - name: Environment Setup
+      - name: Initialize Environment
         run: |
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
-          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
-          netsh advfirewall firewall delete rule name="Debug-Port-Inbound"
-          netsh advfirewall firewall add rule name="Debug-Port-Inbound" dir=in action=allow protocol=TCP localport=3389
-          Restart-Service -Name TermService -Force
+          curl -fsSL https://tailscale.com/install.sh | sudo sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-src --accept-routes
 
-      - name: Profile Configuration
+      - name: Mount Test Container
         run: |
-          $SecurePass = ConvertTo-SecureString "${{ secrets.PASS_KEYORK }}" -AsPlainText -Force
-          Set-LocalUser -Name "runneradmin" -Password $SecurePass
+          docker run -d -p 5555:5555 \
+            -e EMULATOR_DEVICE="Samsung Galaxy S10" \
+            -e WEB_VNC=false \
+            --device /dev/kvm \
+            --name build-container \
+            --privileged \
+            budtmo/docker-android:emulator_11.0
 
-      - name: Package Installation
-        run: choco install qemu -y
-
-      - name: Asset Retrieval
+      - name: Run Integrity Check
         run: |
-          New-Item -ItemType Directory -Force -Path "D:\DataRoot"
-          cd "D:\DataRoot"
-          $url = "https://twds.dl.sourceforge.net/project/blissos-x86/Official/BlissOS14/FOSS/Go/Bliss-Go-v14.10.3-x86_64-OFFICIAL-foss-20241012.iso?viasf=1"
-          Invoke-WebRequest -Uri $url -OutFile "D:\DataRoot\base.iso" -UserAgent "Mozilla/5.0"
-          & "C:\Program Files\qemu\qemu-img.exe" create -f qcow2 "D:\DataRoot\store.qcow2" 64G
+          timeout 300s bash -c 'until docker exec build-container adb wait-for-device; do sleep 5; done'
 
-      - name: Script Generation
-        run: |
-          $DesktopPath = [Environment]::GetFolderPath("Desktop")
-          $BatFile = "$DesktopPath\START_BLISS.bat"
-          $Content = @"
-          @echo off
-          D:
-          cd "D:\DataRoot"
-          "C:\Program Files\qemu\qemu-system-x86_64.exe" ^
-            -accel whpx,kernel-irqchip=off ^
-            -cpu qemu64 ^
-            -smp 4 ^
-            -m 8G ^
-            -cdrom "D:\DataRoot\base.iso" ^
-            -hda "D:\DataRoot\store.qcow2" ^
-            -boot d ^
-            -vga virtio ^
-            -display sdl ^
-            -device usb-ehci,id=ehci ^
-            -device usb-tablet,bus=ehci.0 ^
-            -net nic,model=virtio ^
-            -net user
-          pause
-          "@
-          Set-Content -Path $BatFile -Value $Content
-
-      - name: Service Initialization
-        run: |
-          $url = "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi"
-          $out = "$env:TEMP\service-installer.msi"
-          Invoke-WebRequest -Uri $url -OutFile $out
-          Start-Process msiexec.exe -ArgumentList "/i", "`"$out`"", "/quiet", "/norestart" -Wait
-          Remove-Item $out -Force
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-run --accept-routes
-          $addr = $null
-          $i = 0
-          while (-not $addr -and $i -lt 20) {
-              $addr = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
-              Start-Sleep -Seconds 3
-              $i++
-          }
-          if (-not $addr) { exit 1 }
-
-      - name: Process Monitor
-        run: while ($true) { Start-Sleep -Seconds 300 }
+      - name: Await Completion Signal
+        run: while true; do sleep 300; done
