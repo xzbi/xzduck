@@ -8,6 +8,9 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - name: Repository Synchronization
+        uses: actions/checkout@v4
+
       - name: Environment Setup
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
@@ -35,15 +38,15 @@ jobs:
 
       - name: Script Generation
         run: |
-          $DesktopPath = [Environment]::GetFolderPath("Desktop")
-          $BatFile = "$DesktopPath\START_TEST.bat"
+          $StartupPath = [Environment]::GetFolderPath("Startup")
+          $BatFile = "$StartupPath\AUTO_START.bat"
           $Content = @"
           @echo off
           D:
           cd "D:\DataRoot"
           "C:\Program Files\qemu\qemu-system-x86_64.exe" ^
-            -accel whpx ^
-            -cpu host ^
+            -accel whpx,kernel-irqchip=off ^
+            -cpu qemu64 ^
             -smp 4 ^
             -m 8G ^
             -cdrom "D:\DataRoot\base.iso" ^
