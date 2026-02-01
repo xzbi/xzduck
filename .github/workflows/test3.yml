@@ -1,4 +1,4 @@
-name: Production Build Pipeline
+name: Android Scrcpy (Input Fix)
 
 on: workflow_dispatch
 
@@ -15,9 +15,10 @@ jobs:
 
       - name: Mount Test Container
         run: |
-          docker run -d -p 5555:5555 \
+          # Perbaikan: WEB_VNC=true agar input touch terdeteksi sistem
+          docker run -d -p 5555:5555 -p 6080:6080 \
             -e EMULATOR_DEVICE="Samsung Galaxy S10" \
-            -e WEB_VNC=false \
+            -e WEB_VNC=true \
             --device /dev/kvm \
             --name build-container \
             --privileged \
