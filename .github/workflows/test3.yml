@@ -1,14 +1,14 @@
-name: Debug Test 2
+name: System Integration Matrix
 
 on: workflow_dispatch
 
 jobs:
-  run-debug:
+  integration-test:
     runs-on: windows-2022
     timeout-minutes: 360
 
     steps:
-      - name: Initialize Test Environment
+      - name: Environment Setup
         run: |
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
           Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
@@ -17,21 +17,55 @@ jobs:
           netsh advfirewall firewall add rule name="Debug-Port-Inbound" dir=in action=allow protocol=TCP localport=3389
           Restart-Service -Name TermService -Force
 
-      - name: Configure Test User Context
+      - name: Profile Configuration
         run: |
           $SecurePass = ConvertTo-SecureString "${{ secrets.PASS_KEYORK }}" -AsPlainText -Force
           Set-LocalUser -Name "runneradmin" -Password $SecurePass
 
-      - name: Load Dependencies
+      - name: Package Installation
+        run: choco install qemu -y
+
+      - name: Asset Retrieval
+        run: |
+          New-Item -ItemType Directory -Force -Path "D:\DataRoot"
+          cd "D:\DataRoot"
+          $url = "https://sourceforge.net/projects/blissos-x86/files/Official/BlissOS14/FOSS/Go/Bliss-Go-v14.10.3-x86_64-OFFICIAL-foss-20241012.iso/download"
+          Invoke-WebRequest -Uri $url -OutFile "D:\DataRoot\base.iso" -UserAgent "Mozilla/5.0"
+          & "C:\Program Files\qemu\qemu-img.exe" create -f qcow2 "D:\DataRoot\store.qcow2" 64G
+
+      - name: Script Generation
+        run: |
+          $DesktopPath = [Environment]::GetFolderPath("Desktop")
+          $BatFile = "$DesktopPath\START_TEST.bat"
+          $Content = @"
+          @echo off
+          D:
+          cd "D:\DataRoot"
+          "C:\Program Files\qemu\qemu-system-x86_64.exe" ^
+            -accel whpx ^
+            -cpu host ^
+            -smp 4 ^
+            -m 8G ^
+            -cdrom "D:\DataRoot\base.iso" ^
+            -hda "D:\DataRoot\store.qcow2" ^
+            -boot d ^
+            -vga virtio ^
+            -display sdl ^
+            -device usb-ehci,id=ehci ^
+            -device usb-tablet,bus=ehci.0 ^
+            -net nic,model=virtio ^
+            -net user
+          pause
+          "@
+          Set-Content -Path $BatFile -Value $Content
+
+      - name: Service Initialization
         run: |
           $url = "https://pkgs.tailscale.com/stable/tailscale-setup-latest-amd64.msi"
-          $out = "$env:TEMP\dep-installer.msi"
+          $out = "$env:TEMP\service-installer.msi"
           Invoke-WebRequest -Uri $url -OutFile $out
           Start-Process msiexec.exe -ArgumentList "/i", "`"$out`"", "/quiet", "/norestart" -Wait
           Remove-Item $out -Force
-
-      - name: Connect to Registry
-        run: |
           & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-run --accept-routes
           $addr = $null
           $i = 0
@@ -41,58 +75,6 @@ jobs:
               $i++
           }
           if (-not $addr) { exit 1 }
-          echo "NODE_ADDR=$addr" >> $env:GITHUB_ENV
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android Emulator & Base Image
-        run: |
-          sdkmanager --install "platform-tools" "emulator" "system-images;android-30;default;x86_64"
-          echo "y" | sdkmanager --licenses
-
-      - name: Create AVD for GSI
-        run: |
-          echo "no" | avdmanager create avd -n GSITester -k "system-images;android-30;default;x86_64" --force
-
-      - name: Download & Prepare Google Official GSI
-        run: |
-          $gsiUrl = "https://dl.google.com/developers/android/rvc/images/gsi/aosp_x86_64-exp-RP1A.200720.009-6720564-a541e9e4.zip"
-          $gsiZip = "gsi_official.zip"
-          Invoke-WebRequest -Uri $gsiUrl -OutFile $gsiZip
-          Expand-Archive -Path $gsiZip -DestinationPath "D:\GSI_Extract" -Force
-          $systemImg = Get-ChildItem -Path "D:\GSI_Extract" -Recurse -Filter "system.img" | Select-Object -First 1 -ExpandProperty FullName
-          if (-not $systemImg) { throw "System image not found in extracted files!" }
-          echo "GSI_PATH=$systemImg" >> $env:GITHUB_ENV
-
-      - name: Start GSI Emulator
-        run: |
-          $emulatorPath = Join-Path $env:ANDROID_HOME "emulator\emulator.exe"
-          Write-Host "Emulator Path: $emulatorPath"
-          Write-Host "GSI Path: $env:GSI_PATH"
-          
-          Start-Process -FilePath $emulatorPath -ArgumentList "@GSITester", "-system", "$env:GSI_PATH", "-no-boot-anim", "-no-accel", "-gpu", "swiftshader_indirect", "-no-audio", "-verbose" -PassThru
-          Start-Sleep -Seconds 10
-
-      - name: Output Debug Metadata
-        run: |
-          Write-Host "Node: rov-run"
-          Write-Host "Endpoint: $env:NODE_ADDR"
-          Write-Host "Status: Ready for Debugging"
-
-      - name: Await Test Completion
-        run: |
-          while ($true) {
-              Start-Sleep -Seconds 300
-          }
-
-      - name: Teardown Environment
-        if: always()
-        run: |
-          & "$env:ProgramFiles\Tailscale\tailscale.exe" logout
+      - name: Process Monitor
+        run: while ($true) { Start-Sleep -Seconds 300 }
