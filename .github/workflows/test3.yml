@@ -29,7 +29,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path "D:\DataRoot"
           cd "D:\DataRoot"
-          $url = "https://sourceforge.net/projects/blissos-x86/files/Official/BlissOS14/FOSS/Go/Bliss-Go-v14.10.3-x86_64-OFFICIAL-foss-20241012.iso/download"
+          $url = "https://twds.dl.sourceforge.net/project/blissos-x86/Official/BlissOS14/FOSS/Go/Bliss-Go-v14.10.3-x86_64-OFFICIAL-foss-20241012.iso?viasf=1"
           Invoke-WebRequest -Uri $url -OutFile "D:\DataRoot\base.iso" -UserAgent "Mozilla/5.0"
           & "C:\Program Files\qemu\qemu-img.exe" create -f qcow2 "D:\DataRoot\store.qcow2" 64G
 
