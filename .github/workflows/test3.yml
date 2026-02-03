@@ -8,6 +8,8 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Initialize Environment
         run: |
           curl -fsSL https://tailscale.com/install.sh | sudo sh
@@ -29,3 +31,7 @@ jobs:
 
       - name: Await Completion Signal
         run: while true; do sleep 300; done
+
+      - name: Disconnect Tailscale
+        if: always()
+        run: sudo tailscale logout
