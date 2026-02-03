@@ -26,11 +26,7 @@ kvm-ok
             --device /dev/kvm \
             --name build-container \
             --privileged \
-            budtmo/docker-android:emulator_9.0
-          timeout 300s bash -c 'until docker exec build-container adb wait-for-device; do sleep 5; done'
-
-      - name: Await Completion Signal
-        run: while true; do sleep 300; done
+            budtmo/docker-android:emulator_9.0 && until docker exec build-container adb wait-for-device; do sleep 5; done && while true; do sleep 300; done
 
       - name: Disconnect Tailscale
         if: always()
