@@ -21,7 +21,7 @@ jobs:
             --device /dev/kvm \
             --name build-container \
             --privileged \
-            budtmo/docker-android:emulator_9.0
+            budtmo/docker-android:emulator_10.0
 
       - name: Run Integrity Check
         run: |
