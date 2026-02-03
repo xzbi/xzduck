@@ -12,6 +12,9 @@ jobs:
 
       - name: Initialize Environment
         run: |
+          sudo apt update
+          sudo apt install cpu-checker
+kvm-ok
           curl -fsSL https://tailscale.com/install.sh | sudo sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-src --accept-routes
 
