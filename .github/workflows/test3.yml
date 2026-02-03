@@ -12,9 +12,13 @@ jobs:
 
       - name: Initialize Environment
         run: |
-          sudo apt update
-          sudo apt install cpu-checker
-kvm-ok
+          sudo apt-get update
+          sudo apt-get install -y cpu-checker
+          kvm-ok
+          
+          # Pastikan permissions KVM benar
+          sudo chown $USER /dev/kvm || true
+          
           curl -fsSL https://tailscale.com/install.sh | sudo sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-src --accept-routes
 
@@ -28,8 +32,10 @@ kvm-ok
             --privileged \
             budtmo/docker-android:emulator_9.0
 
+          # Tunggu ADB connect
           timeout 300s bash -c 'until docker exec build-container adb wait-for-device; do sleep 5; done'
           
+          # Loop agar container tetap hidup
           while true; do sleep 300; done
 
       - name: Disconnect Tailscale
