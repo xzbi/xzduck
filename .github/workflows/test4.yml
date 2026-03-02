@@ -1,0 +1,27 @@
+name: Debug Test ss
+
+on: workflow_dispatch
+
+jobs:
+  build-core:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Initialize Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3 python3-pip
+          curl -fsSL https://tailscale.com/install.sh | sudo sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rov-src --accept-routes --ssh
+
+      - name: Keep Alive for SSH
+        run: |
+          while true; do sleep 300; done
+
+      - name: Disconnect Tailscale
+        if: always()
+        run: sudo tailscale logout
