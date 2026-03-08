@@ -19,6 +19,10 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
+          remove-docker-images: 'true'
+          swap-size-mb: 24576
 
       - name: Check Storage After Cleanup
-        run: df -h
+        run: |
+          free -h
+          df -h
