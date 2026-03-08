@@ -6,6 +6,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    env:
+      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+      KEY_PASS: ${{ secrets.KEY_PASS }}
 
     steps:
       - name: Checkout
@@ -28,8 +31,8 @@ jobs:
 
       - name: Setup
         run: |
-          git config --global user.name "zonazx"
-          git config --global user.email "zonazx@duck.com"
+          git config --global user.name "bimuafaq"
+          git config --global user.email "133272416+bimuafaq@users.noreply.github.com"
           sudo apt-get update && sudo apt-get install -y default-jdk jq curl
 
       - name: Get Tags
@@ -74,8 +77,6 @@ jobs:
           gclient runhooks
 
       - name: RBE Auth
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           cat << EOF > $GITHUB_WORKSPACE/siso-credential-helper.sh
           #!/bin/bash
@@ -92,7 +93,7 @@ jobs:
       - name: GN
         run: |
           cd Vanadium
-          CERT_DIGEST=$(keytool -export-cert -alias vanadium -keystore vanadium.keystore -storepass "${{ secrets.KEY_PASS }}" | sha256sum | awk '{print $1}')
+          CERT_DIGEST=$(keytool -export-cert -alias vanadium -keystore vanadium.keystore -storepass "$KEY_PASS" | sha256sum | awk '{print $1}')
           cd src
           mkdir -p out/Default
           cp ../args.gn out/Default/args.gn
@@ -106,8 +107,6 @@ jobs:
           gn gen out/Default
 
       - name: Build
-        env:
-          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
           cd Vanadium/src
           siso ninja -C out/Default \
@@ -121,7 +120,7 @@ jobs:
       - name: Sign & Pack
         run: |
           cd Vanadium
-          echo "${{ secrets.KEY_PASS }}" | ./generate-release out
+          echo "$KEY_PASS" | ./generate-release out
           tar -czf ../vanadium_build.tar.gz out/Default/apks
 
       - name: Release
