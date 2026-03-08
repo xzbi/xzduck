@@ -38,10 +38,10 @@ jobs:
           git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
 
-      - name: Clone & Key
+      - name: Clone & Decode Key
         run: |
           git clone --depth=1 --branch ${{ env.VANADIUM_TAG }} https://github.com/GrapheneOS/Vanadium.git
-          mv $GITHUB_WORKSPACE/vanadium.keystore Vanadium/
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > Vanadium/vanadium.keystore
 
       - name: Fetch
         run: |
@@ -96,6 +96,7 @@ jobs:
           use_remoteexec = true
           symbol_level = 0
           use_siso = true
+          concurrent_links = 1
           EOF
           gn gen out/Default
 
