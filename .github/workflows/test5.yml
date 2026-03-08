@@ -77,9 +77,10 @@ jobs:
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
-          cat << 'EOF' > $GITHUB_WORKSPACE/siso-credential-helper.sh
+          # EOF TANPA KUTIP biar variabel ke-isi otomatis
+          cat << EOF > $GITHUB_WORKSPACE/siso-credential-helper.sh
           #!/bin/bash
-          cat <<JSON
+          cat << JSON
           {
             "headers": { "x-buildbuddy-api-key": ["$BUILDBUDDY_API_KEY"] },
             "expires": "$(date --date='now +6 hours' -Iseconds)"
