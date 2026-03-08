@@ -109,10 +109,16 @@ jobs:
       - name: Build
         run: |
           cd Vanadium/src
-          siso ninja -C out/Default \
-            -reapi_address=nano.buildbuddy.io:443 \
-            -reapi_instance=default \
-            chrome_public_apk
+          for i in {1..10}; do
+            if siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; then
+              break
+            else
+              bash out/Default/siso_failed_commands.sh || true
+              if [ $i -eq 10 ]; then
+                exit 1
+              fi
+            fi
+          done
 
       - name: Sign & Pack
         run: |
