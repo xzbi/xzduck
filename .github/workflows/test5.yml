@@ -96,9 +96,9 @@ jobs:
           cd src
           mkdir -p out/Default
           cp ../args.gn out/Default/args.gn
+          sed -i "s/trichrome_certdigest = .*/trichrome_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
+          sed -i "s/config_apk_certdigest = .*/config_apk_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
           cat <<EOF >> out/Default/args.gn
-          trichrome_certdigest = "$CERT_DIGEST"
-          config_apk_certdigest = "$CERT_DIGEST"
           use_remoteexec = true
           v8_symbol_level = 0
           blink_symbol_level = 0
