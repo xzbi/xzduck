@@ -108,7 +108,7 @@ jobs:
       - name: Build
         run: |
           cd Vanadium/src
-          chrt -b 0 siso ninja -C out/Default/ -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default -strict_remote chrome_public_apk
+          siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk
 
       - name: Sign & Pack
         run: |
