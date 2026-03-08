@@ -1,22 +1,24 @@
-name: Debug Test ss macOS
+name: Check Storage and RAM
 
 on: workflow_dispatch
 
 jobs:
-  build-core:
-    runs-on: macos-latest
-    timeout-minutes: 360
+  check-resources:
+    runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Check Initial RAM and Storage
+        run: |
+          free -h
+          df -h
 
-      - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+      - name: Maximize Build Space
+        uses: easimon/maximize-build-space@master
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
-          hostname: rov-src
-          args: --accept-routes --ssh
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
 
-      - name: Keep Alive for SSH
-        run: while true; do sleep 300; done
+      - name: Check Storage After Cleanup
+        run: df -h
