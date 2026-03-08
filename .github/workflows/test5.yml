@@ -77,7 +77,6 @@ jobs:
         env:
           BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
         run: |
-          # EOF TANPA KUTIP biar variabel ke-isi otomatis
           cat << EOF > $GITHUB_WORKSPACE/siso-credential-helper.sh
           #!/bin/bash
           cat << JSON
