@@ -1,10 +1,10 @@
-name: Debug Test ss Windows
+name: Debug Test ss macOS
 
 on: workflow_dispatch
 
 jobs:
   build-core:
-    runs-on: windows-2022
+    runs-on: macos-latest
     timeout-minutes: 360
 
     steps:
@@ -19,6 +19,4 @@ jobs:
           args: --accept-routes --ssh
 
       - name: Keep Alive for SSH
-        run: |
-          Write-Host "Tailscale SSH Ready! Menunggu koneksi..."
-          while ($true) { Start-Sleep -Seconds 300 }
+        run: while true; do sleep 300; done
