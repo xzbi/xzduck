@@ -112,9 +112,6 @@ jobs:
           siso ninja -C out/Default \
             -reapi_address=nano.buildbuddy.io:443 \
             -reapi_instance=default \
-            -bes_backend=nano.buildbuddy.io:443 \
-            -bes_header=x-buildbuddy-api-key=$BUILDBUDDY_API_KEY \
-            -bes_results_url=https://nano.buildbuddy.io/invocation/ \
             chrome_public_apk
 
       - name: Sign & Pack
