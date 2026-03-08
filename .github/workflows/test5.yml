@@ -1,18 +1,17 @@
-name: Check Storage and RAM
+name: Build Vanadium Prerelease
 
-on: workflow_dispatch
+on:
+  workflow_dispatch:
 
 jobs:
-  check-resources:
+  build:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Check Initial RAM and Storage
-        run: |
-          free -h
-          df -h
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Maximize Build Space
+      - name: Maximize Space
         uses: easimon/maximize-build-space@master
         with:
           remove-dotnet: 'true'
@@ -20,9 +19,100 @@ jobs:
           remove-haskell: 'true'
           remove-codeql: 'true'
           remove-docker-images: 'true'
-          swap-size-mb: 24576
 
-      - name: Check Storage After Cleanup
+      - name: Setup
         run: |
-          free -h
-          df -h
+          git config --global user.name "zonazx"
+          git config --global user.email "zonazx@duck.com"
+          sudo apt-get update && sudo apt-get install -y default-jdk jq curl
+
+      - name: Get Tags
+        run: |
+          LATEST_TAG=$(curl -sL https://api.github.com/repos/GrapheneOS/Vanadium/releases/latest | jq -r .tag_name)
+          CHROMIUM_VERSION=${LATEST_TAG%.0}
+          echo "VANADIUM_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
+
+      - name: Tools
+        run: |
+          git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      - name: Clone & Key
+        run: |
+          git clone --depth=1 --branch ${{ env.VANADIUM_TAG }} https://github.com/GrapheneOS/Vanadium.git
+          mv $GITHUB_WORKSPACE/vanadium.keystore Vanadium/
+
+      - name: Fetch
+        run: |
+          cd Vanadium
+          fetch --nohooks --no-history android
+          cd src
+          git fetch --depth=1 origin refs/tags/${{ env.CHROMIUM_VERSION }}:refs/tags/${{ env.CHROMIUM_VERSION }}
+          git checkout ${{ env.CHROMIUM_VERSION }}
+
+      - name: Deps
+        run: |
+          cd Vanadium/src
+          sudo DEBIAN_FRONTEND=noninteractive ./build/install-build-deps.sh --android
+
+      - name: Patch
+        run: |
+          cd Vanadium/src
+          git am --whitespace=nowarn --keep-non-patch ../patches/*.patch
+
+      - name: Sync
+        run: |
+          cd Vanadium/src
+          gclient sync -D --no-history
+          gclient runhooks
+
+      - name: RBE Auth
+        env:
+          BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
+        run: |
+          cat << 'EOF' > $GITHUB_WORKSPACE/siso-credential-helper.sh
+          #!/bin/bash
+          cat <<JSON
+          {
+            "headers": { "x-buildbuddy-api-key": ["$BUILDBUDDY_API_KEY"] },
+            "expires": "$(date --date='now +6 hours' -Iseconds)"
+          }
+          JSON
+          EOF
+          chmod +x $GITHUB_WORKSPACE/siso-credential-helper.sh
+          echo "SISO_CREDENTIAL_HELPER=$GITHUB_WORKSPACE/siso-credential-helper.sh" >> $GITHUB_ENV
+
+      - name: GN
+        run: |
+          cd Vanadium
+          CERT_DIGEST=$(keytool -export-cert -alias vanadium -keystore vanadium.keystore -storepass "${{ secrets.KEY_PASS }}" | sha256sum | awk '{print $1}')
+          cd src
+          mkdir -p out/Default
+          cp ../args.gn out/Default/args.gn
+          cat <<EOF >> out/Default/args.gn
+          trichrome_certdigest = "$CERT_DIGEST"
+          config_apk_certdigest = "$CERT_DIGEST"
+          use_remoteexec = true
+          symbol_level = 0
+          use_siso = true
+          EOF
+          gn gen out/Default
+
+      - name: Build
+        run: |
+          cd Vanadium/src
+          chrt -b 0 siso ninja -C out/Default/ -reapi_address=remote.buildbuddy.io:443 -reapi_instance=default -strict_remote chrome_public_apk
+
+      - name: Sign & Pack
+        run: |
+          cd Vanadium
+          echo "${{ secrets.KEY_PASS }}" | ./generate-release out
+          tar -czf ../vanadium_build.tar.gz out/Default/apks
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VANADIUM_TAG }}
+          files: vanadium_build.tar.gz
+          prerelease: true
