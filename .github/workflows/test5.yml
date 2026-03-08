@@ -100,9 +100,8 @@ jobs:
           trichrome_certdigest = "$CERT_DIGEST"
           config_apk_certdigest = "$CERT_DIGEST"
           use_remoteexec = true
-          symbol_level = 0
-          use_siso = true
-          concurrent_links = 1
+          v8_symbol_level = 0
+          blink_symbol_level = 0
           EOF
           gn gen out/Default
 
