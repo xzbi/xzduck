@@ -63,7 +63,7 @@ jobs:
       - name: Deps
         run: |
           cd Vanadium/src
-          sudo DEBIAN_FRONTEND=noninteractive ./build/install-build-deps.sh --android
+          sudo DEBIAN_FRONTEND=noninteractive ./build/install-build-deps.sh --android &> /dev/null
 
       - name: Patch
         run: |
@@ -109,16 +109,8 @@ jobs:
       - name: Build
         run: |
           cd Vanadium/src
-          for i in {1..10}; do
-            if siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; then
-              break
-            else
-              bash out/Default/siso_failed_commands.sh || true
-              if [ $i -eq 10 ]; then
-                exit 1
-              fi
-            fi
-          done
+          mkdir -p out/x out/Default/x
+          siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk
 
       - name: Sign & Pack
         run: |
