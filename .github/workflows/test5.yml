@@ -106,28 +106,27 @@ jobs:
           EOF
           gn gen out/Default
 
-      - name: Prepare out/x directory for remote build
-        run: mkdir -p Vanadium/src/out/x
-
       - name: Build
-        id: build-vanadium
         run: |
           cd Vanadium/src
-          if ! siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; then
-            echo "::set-output name=build_failed::true"
-          else
-            echo "::set-output name=build_failed::false"
-          fi
-
-      - name: Show siso_failed_commands.sh if build failed
-        if: steps.build-vanadium.outputs.build_failed == 'true'
-        run: |
-          if [ -f Vanadium/src/out/Default/siso_failed_commands.sh ]; then
-            echo "==== siso_failed_commands.sh ===="
-            cat Vanadium/src/out/Default/siso_failed_commands.sh
-          else
-            echo "No siso_failed_commands.sh file found."
-          fi
+          MAX_RETRIES=5
+          ATTEMPT=1
+          
+          while ! siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; do
+            if [ $ATTEMPT -ge $MAX_RETRIES ]; then
+              echo "❌ Max retries ($MAX_RETRIES) reached. Failing the build to prevent infinite loops."
+              exit 1
+            fi
+            
+            echo "⚠️ Remote build failed on attempt $ATTEMPT. Inspecting failed commands:"
+            cat ./out/Default/siso_failed_commands.sh
+            
+            echo "⚙️ Executing failed tasks locally without timeout..."
+            bash ./out/Default/siso_failed_commands.sh || true
+            
+            ATTEMPT=$((ATTEMPT+1))
+            echo "🔄 Resuming remote build (Attempt $ATTEMPT)..."
+          done
 
       - name: Sign & Pack
         run: |
