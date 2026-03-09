@@ -29,19 +29,35 @@ jobs:
         with:
           swap-size-gb: 10
 
-      - name: Setup, Get Tags, Tools & Clone
+      - name: Setup, Get Tags, Tools, Clone & RBE Auth
         run: |
           git config --global user.name "bimuafaq"
           git config --global user.email "133272416+bimuafaq@users.noreply.github.com"
           sudo apt-get update && sudo apt-get install -y default-jdk jq curl
+          
           LATEST_TAG=$(curl -sL https://api.github.com/repos/GrapheneOS/Vanadium/releases/latest | jq -r .tag_name)
           CHROMIUM_VERSION=${LATEST_TAG%.*}
+          
           echo "VANADIUM_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
+          
           git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+          
           git clone --depth=1 --branch $LATEST_TAG https://github.com/GrapheneOS/Vanadium.git
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > Vanadium/vanadium.keystore
+          
+          cat << EOF > $GITHUB_WORKSPACE/siso-credential-helper.sh
+          #!/bin/bash
+          cat << JSON
+          {
+            "headers": { "x-buildbuddy-api-key": ["$BUILDBUDDY_API_KEY"] },
+            "expires": "\$(date --date='now +6 hours' -Iseconds)"
+          }
+          JSON
+          EOF
+          chmod +x $GITHUB_WORKSPACE/siso-credential-helper.sh
+          echo "SISO_CREDENTIAL_HELPER=$GITHUB_WORKSPACE/siso-credential-helper.sh" >> $GITHUB_ENV
 
       - name: Fetch, Configure, Patch & Sync
         run: |
@@ -95,20 +111,6 @@ jobs:
           cd ..
           gclient sync -D --no-history
           gclient runhooks
-
-      - name: RBE Auth
-        run: |
-          cat << EOF > $GITHUB_WORKSPACE/siso-credential-helper.sh
-          #!/bin/bash
-          cat << JSON
-          {
-            "headers": { "x-buildbuddy-api-key": ["$BUILDBUDDY_API_KEY"] },
-            "expires": "\$(date --date='now +6 hours' -Iseconds)"
-          }
-          JSON
-          EOF
-          chmod +x $GITHUB_WORKSPACE/siso-credential-helper.sh
-          echo "SISO_CREDENTIAL_HELPER=$GITHUB_WORKSPACE/siso-credential-helper.sh" >> $GITHUB_ENV
 
       - name: GN
         run: |
