@@ -38,7 +38,8 @@ jobs:
       - name: Get Tags
         run: |
           LATEST_TAG=$(curl -sL https://api.github.com/repos/GrapheneOS/Vanadium/releases/latest | jq -r .tag_name)
-          CHROMIUM_VERSION=${LATEST_TAG%.1}
+          # Perbaikan: Menggunakan %.* agar dinamis memotong angka di belakang titik terakhir
+          CHROMIUM_VERSION=${LATEST_TAG%.*}
           echo "VANADIUM_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
 
@@ -114,7 +115,8 @@ jobs:
 
       - name: Sync
         run: |
-          cd Vanadium/src
+          # Perbaikan: gclient sync harus dijalankan di direktori yang memiliki file .gclient
+          cd Vanadium
           gclient sync -D --no-history
           gclient runhooks
 
@@ -155,9 +157,10 @@ jobs:
 
       - name: Sign & Pack
         run: |
+          # Perbaikan: Mengarahkan eksekusi ke path "src/out/Default" yang sebenarnya
           cd Vanadium
-          echo "$KEY_PASS" | ./generate-release out
-          tar -czf ../vanadium_build.tar.gz out/Default/apks
+          echo "$KEY_PASS" | ./generate-release src/out/Default
+          tar -czf ../vanadium_build.tar.gz src/out/Default/apks
 
       - name: Release
         uses: softprops/action-gh-release@v2
