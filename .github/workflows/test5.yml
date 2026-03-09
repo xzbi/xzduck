@@ -59,12 +59,28 @@ jobs:
           chmod +x $GITHUB_WORKSPACE/siso-credential-helper.sh
           echo "SISO_CREDENTIAL_HELPER=$GITHUB_WORKSPACE/siso-credential-helper.sh" >> $GITHUB_ENV
 
-      - name: Clone src, Configure, Patch & Sync
+      - name: Configure, Sync, Patch & Runhooks
         run: |
           cd Vanadium
           
-          git clone --depth=1 --branch ${{ env.CHROMIUM_VERSION }} https://chromium.googlesource.com/chromium/src.git src
+          cat <<EOF > .gclient
+          solutions = [
+            {
+              "name": "src",
+              "url": "https://chromium.googlesource.com/chromium/src.git",
+              "managed": False,
+              "custom_vars": {
+                "rbe_instance": "default_instance",
+                "reapi_address": "nano.buildbuddy.io:443",
+                "reapi_backend_config_path": "${GITHUB_WORKSPACE}/Vanadium/src/buildbuddy_backend.star"
+              },
+            },
+          ]
+          target_os = ["android"]
+          EOF
 
+          gclient sync --nohooks --no-history --with_tags --revision src@${{ env.CHROMIUM_VERSION }}
+          
           cat <<EOF > src/buildbuddy_backend.star
           load("@builtin//struct.star", "module")
 
@@ -87,29 +103,13 @@ jobs:
           )
           EOF
 
-          cat <<EOF > .gclient
-          solutions = [
-            {
-              "name": "src",
-              "url": "https://chromium.googlesource.com/chromium/src.git",
-              "managed": False,
-              "custom_vars": {
-                "rbe_instance": "default_instance",
-                "reapi_address": "nano.buildbuddy.io:443",
-                "reapi_backend_config_path": "${GITHUB_WORKSPACE}/Vanadium/src/buildbuddy_backend.star"
-              },
-            },
-          ]
-          target_os = ["android"]
-          EOF
-
           sudo DEBIAN_FRONTEND=noninteractive src/build/install-build-deps.sh --android &> /dev/null
           
           cd src
           git am --whitespace=nowarn --keep-non-patch ../patches/*.patch
           cd ..
           
-          gclient sync -D --no-history
+          gclient runhooks
 
       - name: GN
         run: |
