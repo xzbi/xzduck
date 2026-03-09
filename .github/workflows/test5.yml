@@ -109,24 +109,11 @@ jobs:
       - name: Build
         run: |
           cd Vanadium/src
-          MAX_RETRIES=5
-          ATTEMPT=1
+          bun_dir="out/Default/x"
+          mkdir -p out/x "$bun_dir"
+          touch out/x/.keep "$bun_dir"/.keep
           
-          while ! siso ninja -C out/Default --fast_local -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; do
-            if [ $ATTEMPT -ge $MAX_RETRIES ]; then
-              echo "❌ Max retries ($MAX_RETRIES) reached. Failing the build to prevent infinite loops."
-              exit 1
-            fi
-            
-            echo "⚠️ Remote build failed on attempt $ATTEMPT. Inspecting failed commands:"
-            cat ./out/Default/siso_failed_commands.sh
-            
-            echo "⚙️ Executing failed tasks locally without timeout..."
-            bash ./out/Default/siso_failed_commands.sh || true
-            
-            ATTEMPT=$((ATTEMPT+1))
-            echo "🔄 Resuming remote build (Attempt $ATTEMPT)..."
-          done
+          siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 chrome_public_apk
 
       - name: Sign & Pack
         run: |
