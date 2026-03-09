@@ -59,14 +59,12 @@ jobs:
           chmod +x $GITHUB_WORKSPACE/siso-credential-helper.sh
           echo "SISO_CREDENTIAL_HELPER=$GITHUB_WORKSPACE/siso-credential-helper.sh" >> $GITHUB_ENV
 
-      - name: Fetch, Configure, Patch & Sync
+      - name: Clone src, Configure, Patch & Sync
         run: |
           cd Vanadium
-          fetch --nohooks --no-history android
-          cd src
-          git fetch --depth=1 origin refs/tags/${{ env.CHROMIUM_VERSION }}:refs/tags/${{ env.CHROMIUM_VERSION }}
-          git checkout ${{ env.CHROMIUM_VERSION }}
-          cd ..
+          
+          git clone --depth=1 --branch ${{ env.CHROMIUM_VERSION }} https://chromium.googlesource.com/chromium/src.git src
+
           cat <<EOF > src/buildbuddy_backend.star
           load("@builtin//struct.star", "module")
 
@@ -106,11 +104,12 @@ jobs:
           EOF
 
           sudo DEBIAN_FRONTEND=noninteractive src/build/install-build-deps.sh --android &> /dev/null
+          
           cd src
           git am --whitespace=nowarn --keep-non-patch ../patches/*.patch
           cd ..
+          
           gclient sync -D --no-history
-          gclient runhooks
 
       - name: GN
         run: |
@@ -126,6 +125,9 @@ jobs:
           v8_symbol_level = 0
           blink_symbol_level = 0
           EOF
+          
+          cat out/Default/args.gn
+          
           gn gen out/Default
 
       - name: Build
