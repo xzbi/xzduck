@@ -112,7 +112,7 @@ jobs:
           MAX_RETRIES=5
           ATTEMPT=1
           
-          while ! siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; do
+          while ! siso ninja -C out/Default --fast_local -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; do
             if [ $ATTEMPT -ge $MAX_RETRIES ]; then
               echo "❌ Max retries ($MAX_RETRIES) reached. Failing the build to prevent infinite loops."
               exit 1
