@@ -109,8 +109,14 @@ jobs:
       - name: Build
         run: |
           cd Vanadium/src
-          mkdir -p out/x out/Default/x
-          siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk
+          if ! siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk; then
+            echo "Remote build failed. Inspecting failed commands:"
+            cat ./out/Default/siso_failed_commands.sh
+            echo "Executing failed tasks locally with 5m timeout..."
+            timeout 5m bash ./out/Default/siso_failed_commands.sh || true
+            echo "Resuming remote build..."
+            siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 -reapi_instance=default chrome_public_apk
+          fi
 
       - name: Sign & Pack
         run: |
