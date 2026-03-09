@@ -1,0 +1,123 @@
+name: Build Vanadium Prerelease
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      KEY_PASS: ${{ secrets.KEY_PASS }}
+      CCACHE_DIR: ~/.cache/ccache
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Disk Cleanup & Status
+        run: |
+          df -h
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Setup
+        run: |
+          git config --global user.name "bimuafaq"
+          git config --global user.email "133272416+bimuafaq@users.noreply.github.com"
+          sudo apt-get update && sudo apt-get install -y default-jdk jq curl ccache
+
+      - name: Setup ccache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ github.run_id }}
+          restore-keys: |
+            ccache-
+
+      - name: Get Tags
+        run: |
+          LATEST_TAG=$(curl -sL https://api.github.com/repos/GrapheneOS/Vanadium/releases/latest | jq -r .tag_name)
+          CHROMIUM_VERSION=${LATEST_TAG%.1}
+          echo "VANADIUM_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
+
+      - name: Tools
+        run: |
+          git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      - name: Clone & Decode Key
+        run: |
+          git clone --depth=1 --branch ${{ env.VANADIUM_TAG }} https://github.com/GrapheneOS/Vanadium.git
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > Vanadium/vanadium.keystore
+
+      - name: Fetch
+        run: |
+          cd Vanadium
+          fetch --nohooks --no-history android
+          cd src
+          git fetch --depth=1 origin refs/tags/${{ env.CHROMIUM_VERSION }}:refs/tags/${{ env.CHROMIUM_VERSION }}
+          git checkout ${{ env.CHROMIUM_VERSION }}
+
+      - name: Deps
+        run: |
+          cd Vanadium/src
+          sudo DEBIAN_FRONTEND=noninteractive ./build/install-build-deps.sh --android &> /dev/null
+
+      - name: Patch
+        run: |
+          cd Vanadium/src
+          git am --whitespace=nowarn --keep-non-patch ../patches/*.patch
+
+      - name: Sync
+        run: |
+          cd Vanadium/src
+          gclient sync -D --no-history
+          gclient runhooks
+
+      - name: GN
+        run: |
+          cd Vanadium
+          CERT_DIGEST=$(keytool -export-cert -alias vanadium -keystore vanadium.keystore -storepass "$KEY_PASS" | sha256sum | awk '{print $1}')
+          cd src
+          mkdir -p out/Default
+          cp ../args.gn out/Default/args.gn
+          sed -i "s/trichrome_certdigest = .*/trichrome_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
+          sed -i "s/config_apk_certdigest = .*/config_apk_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
+          cat <<EOF >> out/Default/args.gn
+          cc_wrapper = "ccache"
+          v8_symbol_level = 0
+          blink_symbol_level = 0
+          EOF
+          gn gen out/Default
+
+      - name: Build
+        run: |
+          cd Vanadium/src
+          ccache -M 30G
+          ccache -z
+          autoninja -C out/Default chrome_public_apk
+          echo "--- ccache stats ---"
+          ccache -s
+
+      - name: Sign & Pack
+        run: |
+          cd Vanadium
+          echo "$KEY_PASS" | ./generate-release out
+          tar -czf ../vanadium_build.tar.gz out/Default/apks
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.VANADIUM_TAG }}
+          files: vanadium_build.tar.gz
+          prerelease: true
