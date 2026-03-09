@@ -29,42 +29,28 @@ jobs:
         with:
           swap-size-gb: 10
 
-      - name: Setup
+      - name: Setup, Get Tags, Tools & Clone
         run: |
           git config --global user.name "bimuafaq"
           git config --global user.email "133272416+bimuafaq@users.noreply.github.com"
           sudo apt-get update && sudo apt-get install -y default-jdk jq curl
-
-      - name: Get Tags
-        run: |
           LATEST_TAG=$(curl -sL https://api.github.com/repos/GrapheneOS/Vanadium/releases/latest | jq -r .tag_name)
-          # Perbaikan: Menggunakan %.* agar dinamis memotong angka di belakang titik terakhir
           CHROMIUM_VERSION=${LATEST_TAG%.*}
           echo "VANADIUM_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
-
-      - name: Tools
-        run: |
           git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
-
-      - name: Clone & Decode Key
-        run: |
-          git clone --depth=1 --branch ${{ env.VANADIUM_TAG }} https://github.com/GrapheneOS/Vanadium.git
+          git clone --depth=1 --branch $LATEST_TAG https://github.com/GrapheneOS/Vanadium.git
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > Vanadium/vanadium.keystore
 
-      - name: Fetch
+      - name: Fetch, Configure, Patch & Sync
         run: |
           cd Vanadium
           fetch --nohooks --no-history android
           cd src
           git fetch --depth=1 origin refs/tags/${{ env.CHROMIUM_VERSION }}:refs/tags/${{ env.CHROMIUM_VERSION }}
           git checkout ${{ env.CHROMIUM_VERSION }}
-
-      - name: Configure gclient and BuildBuddy
-        run: |
-          cd Vanadium
-          
+          cd ..
           cat <<EOF > src/buildbuddy_backend.star
           load("@builtin//struct.star", "module")
 
@@ -103,20 +89,10 @@ jobs:
           target_os = ["android"]
           EOF
 
-      - name: Deps
-        run: |
-          cd Vanadium/src
-          sudo DEBIAN_FRONTEND=noninteractive ./build/install-build-deps.sh --android &> /dev/null
-
-      - name: Patch
-        run: |
-          cd Vanadium/src
+          sudo DEBIAN_FRONTEND=noninteractive src/build/install-build-deps.sh --android &> /dev/null
+          cd src
           git am --whitespace=nowarn --keep-non-patch ../patches/*.patch
-
-      - name: Sync
-        run: |
-          # Perbaikan: gclient sync harus dijalankan di direktori yang memiliki file .gclient
-          cd Vanadium
+          cd ..
           gclient sync -D --no-history
           gclient runhooks
 
@@ -157,7 +133,6 @@ jobs:
 
       - name: Sign & Pack
         run: |
-          # Perbaikan: Mengarahkan eksekusi ke path "src/out/Default" yang sebenarnya
           cd Vanadium
           echo "$KEY_PASS" | ./generate-release src/out/Default
           tar -czf ../vanadium_build.tar.gz src/out/Default/apks
