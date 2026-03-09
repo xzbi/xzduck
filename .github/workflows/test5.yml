@@ -1,4 +1,4 @@
-name: Build Vanadium Prerelease
+name: Build V
 
 on:
   workflow_dispatch:
@@ -60,6 +60,48 @@ jobs:
           git fetch --depth=1 origin refs/tags/${{ env.CHROMIUM_VERSION }}:refs/tags/${{ env.CHROMIUM_VERSION }}
           git checkout ${{ env.CHROMIUM_VERSION }}
 
+      - name: Configure gclient and BuildBuddy
+        run: |
+          cd Vanadium
+          
+          cat <<EOF > src/buildbuddy_backend.star
+          load("@builtin//struct.star", "module")
+
+          def __platform_properties(ctx):
+              container_image = "docker://gcr.io/chops-public-images-prod/rbe/siso-chromium/linux@sha256:d7cb1ab14a0f20aa669c23f22c15a9dead761dcac19f43985bf9dd5f41fbef3a"
+              return {
+                  "default": {
+                      "OSFamily": "Linux",
+                      "container-image": container_image,
+                  },
+                  "large": {
+                      "OSFamily": "Linux",
+                      "container-image": container_image,
+                  },
+              }
+
+          backend = module(
+              "backend",
+              platform_properties = __platform_properties,
+          )
+          EOF
+
+          cat <<EOF > .gclient
+          solutions = [
+            {
+              "name": "src",
+              "url": "https://chromium.googlesource.com/chromium/src.git",
+              "managed": False,
+              "custom_vars": {
+                "rbe_instance": "default_instance",
+                "reapi_address": "nano.buildbuddy.io:443",
+                "reapi_backend_config_path": "${GITHUB_WORKSPACE}/Vanadium/src/buildbuddy_backend.star"
+              },
+            },
+          ]
+          target_os = ["android"]
+          EOF
+
       - name: Deps
         run: |
           cd Vanadium/src
@@ -83,7 +125,7 @@ jobs:
           cat << JSON
           {
             "headers": { "x-buildbuddy-api-key": ["$BUILDBUDDY_API_KEY"] },
-            "expires": "$(date --date='now +6 hours' -Iseconds)"
+            "expires": "\$(date --date='now +6 hours' -Iseconds)"
           }
           JSON
           EOF
@@ -108,12 +150,8 @@ jobs:
 
       - name: Build
         run: |
-          cd Vanadium/src
-          bun_dir="out/Default/x"
-          mkdir -p out/x "$bun_dir"
-          touch out/x/.keep "$bun_dir"/.keep
-          
-          siso ninja -C out/Default -reapi_address=nano.buildbuddy.io:443 chrome_public_apk
+          cd Vanadium/src          
+          siso ninja -C out/Default chrome_public_apk
 
       - name: Sign & Pack
         run: |
