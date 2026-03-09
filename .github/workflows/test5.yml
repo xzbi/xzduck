@@ -116,30 +116,30 @@ jobs:
           cd Vanadium
           CERT_DIGEST=$(keytool -export-cert -alias vanadium -keystore vanadium.keystore -storepass "$KEY_PASS" | sha256sum | awk '{print $1}')
           cd src
-          mkdir -p out/Default
-          cp ../args.gn out/Default/args.gn
-          sed -i "s/trichrome_certdigest = .*/trichrome_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
-          sed -i "s/config_apk_certdigest = .*/config_apk_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
-          cat <<EOF >> out/Default/args.gn
+          mkdir -p out/x
+          cp ../args.gn out/x/args.gn
+          sed -i "s/trichrome_certdigest = .*/trichrome_certdigest = \"$CERT_DIGEST\"/" out/x/args.gn
+          sed -i "s/config_apk_certdigest = .*/config_apk_certdigest = \"$CERT_DIGEST\"/" out/x/args.gn
+          cat <<EOF >> out/x/args.gn
           use_remoteexec = true
           v8_symbol_level = 0
           blink_symbol_level = 0
           EOF
           
-          cat out/Default/args.gn
+          cat out/x/args.gn
           
-          gn gen out/Default
+          gn gen out/x
 
       - name: Build
         run: |
           cd Vanadium/src          
-          siso ninja -C out/Default chrome_public_apk
+          siso ninja -C out/x chrome_public_apk
 
       - name: Sign & Pack
         run: |
           cd Vanadium
-          echo "$KEY_PASS" | ./generate-release src/out/Default
-          tar -czf ../vanadium_build.tar.gz src/out/Default/apks
+          echo "$KEY_PASS" | ./generate-release src/out/x
+          tar -czf ../vanadium_build.tar.gz src/out/x/apks
 
       - name: Release
         uses: softprops/action-gh-release@v2
