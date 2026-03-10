@@ -98,12 +98,17 @@ jobs:
           gn gen out/Default
 
       - name: Build
+        id: build_step
         run: |
           cd Vanadium/src
           ccache -M 4.8G
           ccache -z
-          autoninja -C out/Default chrome_public_apk
-          echo "--- ccache stats ---"
+          timeout 4h autoninja -C out/Default chrome_public_apk || echo "Build stopped by timeout"
+        continue-on-error: true
+
+      - name: Build Stats
+        run: |
+          cd Vanadium/src
           ccache -s
 
       - name: Save ccache
@@ -114,12 +119,14 @@ jobs:
           key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
 
       - name: Sign & Pack
+        if: steps.build_step.outcome == 'success'
         run: |
           cd Vanadium
           echo "$KEY_PASS" | ./generate-release out
           tar -czf ../vanadium_build.tar.gz out/Default/apks
 
       - name: Release
+        if: steps.build_step.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VANADIUM_TAG }}
