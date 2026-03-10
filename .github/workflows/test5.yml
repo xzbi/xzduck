@@ -7,8 +7,8 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     env:
-      BUILDBUDDY_API_KEY: ${{ secrets.BUILDBUDDY_API_KEY }}
       KEY_PASS: ${{ secrets.KEY_PASS }}
+      CCACHE_DIR: ~/.cache/ccache
 
     steps:
       - name: Checkout
@@ -29,86 +29,45 @@ jobs:
         with:
           swap-size-gb: 10
 
-      - name: Setup, Get Tags, Tools, Clone & RBE Auth
+      - name: Setup
         run: |
           git config --global user.name "bimuafaq"
           git config --global user.email "133272416+bimuafaq@users.noreply.github.com"
-          sudo apt-get update && sudo apt-get install -y default-jdk jq curl
-          
+          sudo apt-get update && sudo apt-get install -y default-jdk jq curl ccache
+
+      - name: Restore ccache
+        id: ccache-restore
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ github.run_id }}
+          restore-keys: |
+            ccache-
+
+      - name: Get Tags & Tools
+        run: |
           LATEST_TAG=$(curl -sL https://api.github.com/repos/GrapheneOS/Vanadium/releases/latest | jq -r .tag_name)
           CHROMIUM_VERSION=${LATEST_TAG%.*}
-          
           echo "VANADIUM_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "CHROMIUM_VERSION=$CHROMIUM_VERSION" >> $GITHUB_ENV
-          
           git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
-          
-          git clone --depth=1 --branch $LATEST_TAG https://github.com/GrapheneOS/Vanadium.git
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > Vanadium/vanadium.keystore
-          
-          cat << EOF > $GITHUB_WORKSPACE/siso-credential-helper.sh
-          #!/bin/bash
-          cat << JSON
-          {
-            "headers": { "x-buildbuddy-api-key": ["$BUILDBUDDY_API_KEY"] },
-            "expires": "\$(date --date='now +6 hours' -Iseconds)"
-          }
-          JSON
-          EOF
-          chmod +x $GITHUB_WORKSPACE/siso-credential-helper.sh
-          echo "SISO_CREDENTIAL_HELPER=$GITHUB_WORKSPACE/siso-credential-helper.sh" >> $GITHUB_ENV
 
-      - name: Configure, Sync, Patch & Runhooks
+      - name: Clone & Decode Key
+        run: |
+          git clone --depth=1 --branch ${{ env.VANADIUM_TAG }} https://github.com/GrapheneOS/Vanadium.git
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > Vanadium/vanadium.keystore
+
+      - name: Fetch & Sync
         run: |
           cd Vanadium
-          
-          cat <<EOF > .gclient
-          solutions = [
-            {
-              "name": "src",
-              "url": "https://chromium.googlesource.com/chromium/src.git",
-              "managed": False,
-              "custom_vars": {
-                "rbe_instance": "default_instance",
-                "reapi_address": "nano.buildbuddy.io:443",
-                "reapi_backend_config_path": "${GITHUB_WORKSPACE}/Vanadium/src/buildbuddy_backend.star"
-              },
-            },
-          ]
-          target_os = ["android"]
-          EOF
-
-          gclient sync --nohooks --no-history --with_tags --revision src@${{ env.CHROMIUM_VERSION }}
-          
-          cat <<EOF > src/buildbuddy_backend.star
-          load("@builtin//struct.star", "module")
-
-          def __platform_properties(ctx):
-              container_image = "docker://gcr.io/chops-public-images-prod/rbe/siso-chromium/linux@sha256:d7cb1ab14a0f20aa669c23f22c15a9dead761dcac19f43985bf9dd5f41fbef3a"
-              return {
-                  "default": {
-                      "OSFamily": "Linux",
-                      "container-image": container_image,
-                  },
-                  "large": {
-                      "OSFamily": "Linux",
-                      "container-image": container_image,
-                  },
-              }
-
-          backend = module(
-              "backend",
-              platform_properties = __platform_properties,
-          )
-          EOF
-
-          sudo DEBIAN_FRONTEND=noninteractive src/build/install-build-deps.sh --android &> /dev/null
-          
+          fetch --nohooks --no-history android
           cd src
+          git fetch --depth=1 origin refs/tags/${{ env.CHROMIUM_VERSION }}:refs/tags/${{ env.CHROMIUM_VERSION }}
+          git checkout ${{ env.CHROMIUM_VERSION }}
+          sudo DEBIAN_FRONTEND=noninteractive ./build/install-build-deps.sh --android &> /dev/null
+          gclient sync -D --no-history
           git am --whitespace=nowarn --keep-non-patch ../patches/*.patch
-          cd ..
-          
           gclient runhooks
 
       - name: GN
@@ -116,32 +75,47 @@ jobs:
           cd Vanadium
           CERT_DIGEST=$(keytool -export-cert -alias vanadium -keystore vanadium.keystore -storepass "$KEY_PASS" | sha256sum | awk '{print $1}')
           cd src
-          mkdir -p out/x
-          cp ../args.gn out/x/args.gn
-          sed -i "s/trichrome_certdigest = .*/trichrome_certdigest = \"$CERT_DIGEST\"/" out/x/args.gn
-          sed -i "s/config_apk_certdigest = .*/config_apk_certdigest = \"$CERT_DIGEST\"/" out/x/args.gn
-          cat <<EOF >> out/x/args.gn
-          use_remoteexec = true
+          mkdir -p out/Default
+          cp ../args.gn out/Default/args.gn
+          sed -i "s/trichrome_certdigest = .*/trichrome_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
+          sed -i "s/config_apk_certdigest = .*/config_apk_certdigest = \"$CERT_DIGEST\"/" out/Default/args.gn
+          sed -i "s/symbol_level = 1/symbol_level = 0/g" out/Default/args.gn
+          cat <<EOF >> out/Default/args.gn
+          cc_wrapper = "ccache"
           v8_symbol_level = 0
           blink_symbol_level = 0
           EOF
-          
-          cat out/x/args.gn
-          
-          gn gen out/x
+          gn gen out/Default
 
       - name: Build
+        id: build_step
         run: |
-          cd Vanadium/src          
-          siso ninja -C out/x chrome_public_apk
+          cd Vanadium/src
+          ccache -M 10G
+          ccache -z
+          timeout 4h autoninja -C out/Default chrome_public_apk || echo "Timeout reached, stopping build..."
+        continue-on-error: true
+
+      - name: Save ccache
+        if: always() && steps.ccache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
+
+      - name: Build Stats
+        run: |
+          ccache -s
 
       - name: Sign & Pack
+        if: steps.build_step.outcome == 'success'
         run: |
           cd Vanadium
-          echo "$KEY_PASS" | ./generate-release src/out/x
-          tar -czf ../vanadium_build.tar.gz src/out/x/apks
+          echo "$KEY_PASS" | ./generate-release out
+          tar -czf ../vanadium_build.tar.gz out/Default/apks
 
       - name: Release
+        if: steps.build_step.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VANADIUM_TAG }}
