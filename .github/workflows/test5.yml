@@ -9,10 +9,16 @@ jobs:
     env:
       KEY_PASS: ${{ secrets.KEY_PASS }}
       CCACHE_DIR: ~/.cache/ccache
+      USE_CCACHE: 1
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 6
 
       - name: Disk Cleanup & Status
         run: |
@@ -23,11 +29,6 @@ jobs:
           sudo rm -rf "/usr/local/share/boost"
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
           df -h
-
-      - name: Set Swap Space
-        uses: pierotofy/set-swap-space@master
-        with:
-          swap-size-gb: 6
 
       - name: Setup
         run: |
@@ -94,7 +95,7 @@ jobs:
           cd Vanadium/src
           ccache -M 4.8G
           ccache -z
-          timeout 4h autoninja -C out/Default chrome_public_apk || echo "Timeout/Build interrupted..."
+          timeout 4h autoninja -C out/Default chrome_public_apk || echo "Timeout reached..."
         continue-on-error: true
 
       - name: Save ccache
