@@ -27,7 +27,7 @@ jobs:
       - name: Set Swap Space
         uses: pierotofy/set-swap-space@master
         with:
-          swap-size-gb: 10
+          swap-size-gb: 6
 
       - name: Setup
         run: |
@@ -84,6 +84,7 @@ jobs:
           cc_wrapper = "ccache"
           v8_symbol_level = 0
           blink_symbol_level = 0
+          enable_nacl = false
           EOF
           gn gen out/Default
 
@@ -91,9 +92,9 @@ jobs:
         id: build_step
         run: |
           cd Vanadium/src
-          ccache -M 10G
+          ccache -M 4.8G
           ccache -z
-          timeout 4h autoninja -C out/Default chrome_public_apk || echo "Timeout reached, stopping build..."
+          timeout 4h autoninja -C out/Default chrome_public_apk || echo "Timeout/Build interrupted..."
         continue-on-error: true
 
       - name: Save ccache
@@ -106,6 +107,7 @@ jobs:
       - name: Build Stats
         run: |
           ccache -s
+          df -h
 
       - name: Sign & Pack
         if: steps.build_step.outcome == 'success'
