@@ -131,7 +131,8 @@ jobs:
 
       - name: Build
         run: |
-          export RBE_EXEC_STRATEGY=remote_local_fallback
+          export RBE_exec_strategy=remote_local_fallback
+          export RBE_num_remote_reruns=1
           cd Vanadium/src          
           siso ninja -k 0 -C out/Default chrome_public_apk
 
