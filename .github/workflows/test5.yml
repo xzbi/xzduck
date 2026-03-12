@@ -123,6 +123,7 @@ jobs:
           sed -i "s/symbol_level = 1/symbol_level = 0/" out/Default/args.gn
           cat <<EOF >> out/Default/args.gn
           use_remoteexec = true
+          is_high_end_android = false
           v8_symbol_level = 0
           blink_symbol_level = 0
           EOF
@@ -133,8 +134,9 @@ jobs:
         run: |
           export RBE_exec_strategy=remote_local_fallback
           export RBE_num_remote_reruns=3
-          cd Vanadium/src          
-          siso ninja -k 0 -C out/Default chrome_public_apk
+          cd Vanadium/srs
+          timeout 40m siso ninja --offline -C out/Default chrome_public_apk
+          siso ninja -C out/Default chrome_public_apk
 
       - name: Sign & Pack
         run: |
