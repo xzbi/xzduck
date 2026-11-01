@@ -1,16 +1,21 @@
 name: Debug Py Test
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 jobs:
-  build:
+  build-core:
     runs-on: windows-latest
+    timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
-      - uses: tailscale/github-action@v4
-        with:
-          authkey: ${{ secrets.TS_AUTH_KEY }}
-          hostname: gh-python
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - run: python main.py
+      - name: Initialize Environment
+        run: python main.py setup
+
+      - name: npm Build      
+        run: python main.py build
+
+      - name: npm clean
+        if: always()
+        run: python main.py clean
