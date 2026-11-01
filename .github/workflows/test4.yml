@@ -13,9 +13,9 @@ jobs:
       - name: Initialize Environment
         run: python main.py setup
 
-      - name: npm Build      
+      - name: duck Build
         run: python main.py build
 
-      - name: npm clean
+      - name: duck clean
         if: always()
         run: python main.py clean
