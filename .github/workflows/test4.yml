@@ -1,4 +1,4 @@
-name: Debug Test npm
+name: Debug Js Test
 
 on: workflow_dispatch
 
