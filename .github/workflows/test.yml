@@ -29,11 +29,14 @@ jobs:
           log-mode: quiet
 
       - name: Initialize Environment
+        working-directory: ./tools
         run: python main.py setup
 
       - name: duck Build
+        working-directory: ./tools
         run: python main.py build
 
       - name: duck clean
         if: always()
+        working-directory: ./tools
         run: python main.py clean
