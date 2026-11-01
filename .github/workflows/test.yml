@@ -1,4 +1,4 @@
-name: Python Test
+name: Debug Py Test
 
 on:
   workflow_dispatch:
