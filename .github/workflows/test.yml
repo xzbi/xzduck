@@ -19,7 +19,7 @@ jobs:
       - name: Checkout tools repo
         uses: actions/checkout@v7
         with:
-          repository: xzbi/tools
+          repository: 1mnt/nomnt
           path: tools
           token: ${{ secrets.TS_GP }}
 
@@ -33,11 +33,11 @@ jobs:
 
       - name: Initialize Environment
         working-directory: ./tools
-        run: python main.py setup
+        run: ./main.ps1 setup
 
       - name: duck Build
         working-directory: ./tools
-        run: python main.py build
+        run: ./main.ps1 build
 
       - name: duck clean
         if: always()
