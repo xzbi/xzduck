@@ -10,6 +10,8 @@ jobs:
   build-core:
     runs-on: ubuntu-22.04
     timeout-minutes: 360
+    env:
+      TS_GP: ${{ secrets.TS_GP }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
