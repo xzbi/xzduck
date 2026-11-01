@@ -39,6 +39,6 @@ jobs:
         run: python main.py build
 
       - name: duck clean
-        working-directory: ./tools
         if: always()
+        working-directory: ./tools
         run: python main.py clean
