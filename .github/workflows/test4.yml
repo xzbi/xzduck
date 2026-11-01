@@ -9,16 +9,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
-      - uses: actions/setup-node@v7
 
       - name: Initialize Environment
-        run: ${{ secrets.NM_API_KEY }} && ./nm.sh setup
+        run: ./nm.sh setup
 
-      - name: npm Build
-        working-directory: nm
+      - name: npm Build      
         run: ./nm.sh build
 
       - name: npm clean
-        working-directory: nm
         if: always()
         run: ./nm.sh clean
