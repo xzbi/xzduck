@@ -19,6 +19,7 @@ jobs:
         with:
           repository: xzbi/tools
           path: tools
+          token: ${{ secrets.TS_GHP }}
 
       - name: Tailscale
         uses: tailscale/github-action@v4
@@ -27,8 +28,10 @@ jobs:
           hostname: duck2
           tags: tag:ci
           log-mode: quiet
+          args: --ssh
 
       - name: Initialize Environment
+        working-directory: ./tools
         run: python main.py setup
 
       - name: duck Build
