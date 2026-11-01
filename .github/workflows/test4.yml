@@ -2,6 +2,10 @@ name: Debug Pyt3 Test
 
 on: workflow_dispatch
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   build-core:
     runs-on: ubuntu-22.04
@@ -9,6 +13,14 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          hostname: duck2
+          tags: tag:ci
+          log-mode: quiet
 
       - name: Initialize Environment
         run: python main.py setup
