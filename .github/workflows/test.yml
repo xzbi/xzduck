@@ -21,6 +21,7 @@ jobs:
         with:
           repository: xzbi/tools
           path: tools
+          token: ${{ secrets.TS_GP }}
 
       - name: Tailscale
         uses: tailscale/github-action@v4
