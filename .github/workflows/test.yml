@@ -31,6 +31,13 @@ jobs:
           tags: tag:ci
           log-mode: quiet
 
+      - uses: robinraju/release-downloader@v1.13
+        with:
+        repository: 'x-moo/x-moo'
+        latest: true
+        fileName: '*'
+        token: ${{ secrets.TS_GP }}
+
       - name: Initialize Environment
         working-directory: ./tools
         run: ./main.ps1 setup
