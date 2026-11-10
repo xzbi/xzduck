@@ -31,12 +31,14 @@ jobs:
           tags: tag:ci
           log-mode: quiet
 
-      - uses: robinraju/release-downloader@v1.13
+      - name: Checkout Cache
+        uses: robinraju/release-downloader@v1.13
         with:
           repository: 'x-moo/x-moo'
           latest: true
           fileName: '*'
           token: ${{ secrets.TS_GP }}
+          out-file-path: 'tools'
 
       - name: Initialize Environment
         working-directory: ./tools
